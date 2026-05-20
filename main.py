@@ -1,3 +1,4 @@
+from dotenv import load_dotenv
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.llms.azure_openai import AzureOpenAI
 from llama_index.core import Settings
@@ -8,21 +9,24 @@ import pandas as pd
 from llama_index.core import VectorStoreIndex, Document
 import os
 
+load_dotenv()
+AZURE_OPENAI_KEY = os.getenv("AZURE_OPENAI_KEY")
+AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
+CONNECTION_STRING = os.getenv("CONNECTION_STRING")
+
 Settings.embed_model = HuggingFaceEmbedding(
     model_name="BAAI/bge-small-en-v1.5"
 )
 Settings.llm = AzureOpenAI(
     model="gpt-4.1-mini",
     deployment_name="gpt-4.1-mini",
-    api_key="80aR3qn0em5AX4iq8Fu4spJVw1Oscb4ck7KqMDvZQYPH94iaoiR7JQQJ99BEAC77bzfXJ3w3AAABACOGmMi0",
-    azure_endpoint="https://neoteric-ai.openai.azure.com/",
+    api_key=AZURE_OPENAI_KEY,
+    azure_endpoint=AZURE_OPENAI_ENDPOINT,
     api_version="2024-12-01-preview"
 )
 
 app = FastAPI()
 
-
-CONNECTION_STRING = "DefaultEndpointsProtocol=https;AccountName=projectcortexlaksh123;AccountKey=znkQwBitvzLMy2qt8id2uF/ZpkkOnFRQ4U6/5nBmL/DBo1TCL0bKjpUe31Lp1h/FWCZJA8z2hAYs+ASt+8aCeA==;EndpointSuffix=core.windows.net"
 
 index = None
 
