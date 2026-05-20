@@ -80,7 +80,7 @@ def home():
 
     return {
         "status": "running",
-        "message": "Project Cortex v2"
+        "message": "Project Cortex v2."
     }
 
 
