@@ -59,7 +59,7 @@ def home():
 
     return {
         "status": "running",
-        "message": "Project Cortex FastAPI Backend"
+        "message": "Project Cortex v2"
     }
 
 
