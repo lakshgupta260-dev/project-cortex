@@ -6,6 +6,7 @@ from llama_index.core import Settings
 from fastapi import FastAPI, UploadFile, File
 from azure.storage.blob import BlobServiceClient
 import pandas as pd
+from azure.cosmos import CosmosClient
 from llama_index.core import VectorStoreIndex, Document
 import os
 
@@ -13,6 +14,16 @@ load_dotenv()
 AZURE_OPENAI_KEY = os.getenv("AZURE_OPENAI_KEY")
 AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
 CONNECTION_STRING = os.getenv("CONNECTION_STRING")
+
+COSMOS_ENDPOINT = os.getenv("COSMOS_ENDPOINT")
+COSMOS_KEY = os.getenv("COSMOS_KEY")
+COSMOS_DATABASE = os.getenv("COSMOS_DATABASE")
+COSMOS_CONTAINER = os.getenv("COSMOS_CONTAINER")
+cosmos_client = CosmosClient(COSMOS_ENDPOINT, COSMOS_KEY)
+
+database = cosmos_client.get_database_client(COSMOS_DATABASE)
+
+container = database.get_container_client(COSMOS_CONTAINER)
 
 Settings.embed_model = HuggingFaceEmbedding(
     model_name="BAAI/bge-small-en-v1.5"
@@ -50,7 +61,17 @@ def startup_event():
 
         documents.append(Document(text=text))
 
-    index = VectorStoreIndex.from_documents(documents)
+    for i, doc in enumerate(documents):
+
+            embedding = Settings.embed_model.get_text_embedding(doc.text)
+
+            item = {
+                "id": str(i),
+                "text": doc.text,
+                "embedding": embedding
+            }
+
+            container.upsert_item(item)
 
     print("Index created successfully")
     
@@ -108,9 +129,44 @@ def chat(question: dict):
 
     user_question = question["question"]
 
-    query_engine = index.as_query_engine()
+    query_embedding = Settings.embed_model.get_text_embedding(
+        user_question
+    )
 
-    response = query_engine.query(user_question)
+    query = """
+    SELECT TOP 3 c.text
+    FROM c
+    ORDER BY VectorDistance(c.embedding, @embedding)
+    """
+
+    parameters = [
+        {
+            "name": "@embedding",
+            "value": query_embedding
+        }
+    ]
+
+    results = list(
+        container.query_items(
+            query=query,
+            parameters=parameters,
+            enable_cross_partition_query=True
+        )
+    )
+
+    context = "\n".join(
+        [item["text"] for item in results]
+    )
+
+    prompt = f"""
+    Context:
+    {context}
+
+    Question:
+    {user_question}
+    """
+
+    response = Settings.llm.complete(prompt)
 
     return {
         "question": user_question,

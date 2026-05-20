@@ -8,3 +8,4 @@ llama-index-embeddings-huggingface
 sentence-transformers
 python-dotenv
 python-multipart
+azure-cosmos
