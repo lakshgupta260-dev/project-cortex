@@ -43,44 +43,16 @@ index = None
 
 
 @app.on_event("startup")
-def startup_event():
+async def startup_event():
 
-    global index
+    print("Application started")
 
-    df = pd.read_csv("sales_data.csv")
-
-    documents = []
-
-    for _, row in df.iterrows():
-
-        text = (
-            f"Product: {row['product']}, "
-            f"Month: {row['month']}, "
-            f"Sales: {row['sales']}"
-        )
-
-        documents.append(Document(text=text))
-
-    for i, doc in enumerate(documents):
-
-            embedding = Settings.embed_model.get_text_embedding(doc.text)
-
-            item = {
-                "id": str(i),
-                "text": doc.text,
-                "embedding": embedding
-            }
-
-            container.upsert_item(item)
-
-    print("Index created successfully")
-    
 @app.get("/")
 def home():
 
     return {
         "status": "running",
-        "message": "Project Cortex v2."
+        "message": "Project Cortex v3"
     }
 
 
