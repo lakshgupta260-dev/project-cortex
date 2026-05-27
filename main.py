@@ -477,9 +477,7 @@ async def whatsapp_webhook(payload: dict):
 
         prompt = f"""
         You are a helpful AI assistant.
-
-        Prioritize the most relevant source.
-        Ignore unrelated context.
+        Answer the user's question using the provided context.
 
         Context:
         {context}
