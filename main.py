@@ -8,6 +8,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from azure.cosmos import CosmosClient
 from fastapi import Request
 from fastapi.responses import PlainTextResponse
+from fastapi import Query
+from fastapi.responses import PlainTextResponse
 import pandas as pd
 import requests
 import os
@@ -370,28 +372,22 @@ def chat(question: dict):
         "sources": sources
     }
 @app.get("/webhook")
-async def verify_webhook(request: Request):
+async def verify_webhook(
+    hub_mode: str = Query(None, alias="hub.mode"),
+    hub_verify_token: str = Query(None, alias="hub.verify_token"),
+    hub_challenge: str = Query(None, alias="hub.challenge")
+):
 
-    mode = request.query_params.get(
-        "hub.mode"
-    )
+    print("VERIFY TOKEN FROM META:", hub_verify_token)
+    print("VERIFY TOKEN FROM ENV:", VERIFY_TOKEN)
 
-    token = request.query_params.get(
-        "hub.verify_token"
-    )
+    if hub_mode == "subscribe" and hub_verify_token == VERIFY_TOKEN:
 
-    challenge = request.query_params.get(
-        "hub.challenge"
-    )
+        print("WEBHOOK VERIFIED SUCCESSFULLY")
 
-    if (
-        mode == "subscribe"
-        and token == VERIFY_TOKEN
-    ):
+        return PlainTextResponse(content=hub_challenge)
 
-        return PlainTextResponse(
-            content=challenge
-        )
+    print("WEBHOOK VERIFICATION FAILED")
 
     return PlainTextResponse(
         content="Verification failed",
