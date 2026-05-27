@@ -404,14 +404,29 @@ async def whatsapp_webhook(payload: dict):
 
     try:
 
-        entry = payload["entry"][0]
+        print("Webhook Payload:", payload)
 
-        changes = entry["changes"][0]
+        entry = payload.get("entry", [])
 
-        value = changes["value"]
+        if not entry:
+
+            return {
+                "status": "no entry"
+            }
+
+        changes = entry[0].get("changes", [])
+
+        if not changes:
+
+            return {
+                "status": "no changes"
+            }
+
+        value = changes[0].get("value", {})
 
         messages = value.get("messages")
 
+        # Ignore delivery/status webhooks
         if not messages:
 
             return {
@@ -420,9 +435,18 @@ async def whatsapp_webhook(payload: dict):
 
         message = messages[0]
 
+        # Ignore non-text messages
+        if "text" not in message:
+
+            return {
+                "status": "non-text message ignored"
+            }
+
         user_question = message["text"]["body"]
 
         sender = message["from"]
+
+        print("User Message:", user_question)
 
         # VECTOR SEARCH
 
@@ -472,6 +496,8 @@ async def whatsapp_webhook(payload: dict):
 
         answer = str(response)
 
+        print("AI Response:", answer)
+
         # SEND MESSAGE BACK TO WHATSAPP
 
         url = f"https://graph.facebook.com/v22.0/{PHONE_NUMBER_ID}/messages"
@@ -489,10 +515,16 @@ async def whatsapp_webhook(payload: dict):
             }
         }
 
-        requests.post(
+        whatsapp_response = requests.post(
             url,
             headers=headers,
             json=data
+        )
+
+        print(
+            "WhatsApp API Response:",
+            whatsapp_response.status_code,
+            whatsapp_response.text
         )
 
         return {
@@ -500,6 +532,8 @@ async def whatsapp_webhook(payload: dict):
         }
 
     except Exception as e:
+
+        print("Webhook Error:", str(e))
 
         return {
             "error": str(e)
