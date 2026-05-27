@@ -6,6 +6,8 @@ from fastapi import FastAPI, UploadFile, File
 from azure.storage.blob import BlobServiceClient
 from fastapi.middleware.cors import CORSMiddleware
 from azure.cosmos import CosmosClient
+from fastapi import Request
+from fastapi.responses import PlainTextResponse
 import pandas as pd
 import requests
 import os
@@ -368,19 +370,33 @@ def chat(question: dict):
         "sources": sources
     }
 @app.get("/webhook")
-def verify_webhook(
-    hub_mode: str = None,
-    hub_verify_token: str = None,
-    hub_challenge: str = None
-):
+async def verify_webhook(request: Request):
 
-    if hub_verify_token == VERIFY_TOKEN:
+    mode = request.query_params.get(
+        "hub.mode"
+    )
 
-        return int(hub_challenge)
+    token = request.query_params.get(
+        "hub.verify_token"
+    )
 
-    return {
-        "error": "Invalid verify token"
-    }
+    challenge = request.query_params.get(
+        "hub.challenge"
+    )
+
+    if (
+        mode == "subscribe"
+        and token == VERIFY_TOKEN
+    ):
+
+        return PlainTextResponse(
+            content=challenge
+        )
+
+    return PlainTextResponse(
+        content="Verification failed",
+        status_code=403
+    )
 
 
 @app.post("/webhook")
