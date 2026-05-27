@@ -9,6 +9,7 @@ from azure.cosmos import CosmosClient
 from fastapi import Request
 from fastapi.responses import PlainTextResponse
 from fastapi import Query
+from fastapi.responses import PlainTextResponse
 import pandas as pd
 import requests
 import os
@@ -118,6 +119,8 @@ async def upload_file(file: UploadFile = File(...)):
 
     extracted_texts = []
 
+    # CSV FILES
+
     if file.filename.endswith(".csv"):
 
         temp_file_path = file.filename
@@ -136,6 +139,8 @@ async def upload_file(file: UploadFile = File(...)):
 
             extracted_texts.append(text)
 
+    # TXT FILES
+
     elif file.filename.endswith(".txt"):
 
         text = file_content.decode("utf-8")
@@ -143,6 +148,8 @@ async def upload_file(file: UploadFile = File(...)):
         chunks = chunk_text(text)
 
         extracted_texts.extend(chunks)
+
+    # PDF FILES
 
     elif file.filename.endswith(".pdf"):
 
@@ -165,6 +172,8 @@ async def upload_file(file: UploadFile = File(...)):
                 chunks = chunk_text(text)
 
                 extracted_texts.extend(chunks)
+
+    # DOCX FILES
 
     elif file.filename.endswith(".docx"):
 
@@ -189,6 +198,8 @@ async def upload_file(file: UploadFile = File(...)):
         chunks = chunk_text(doc_text)
 
         extracted_texts.extend(chunks)
+
+    # STORE EMBEDDINGS
 
     for index, text in enumerate(extracted_texts):
 
@@ -341,12 +352,17 @@ def chat(question: dict):
     Use only context directly related to the question.
     Answer ONLY using the provided context.
 
-Context:
-{context}
+    For numerical questions:
+    - carefully compare all values
+    - do not guess
+    - identify exact maximum/minimum values
 
-Question:
-{user_question}
-"""
+    Context:
+    {context}
+
+    Question:
+    {user_question}
+    """
 
     response = Settings.llm.complete(prompt)
 
@@ -355,8 +371,6 @@ Question:
         "answer": str(response),
         "sources": sources
     }
-
-
 @app.get("/webhook")
 async def verify_webhook(
     hub_mode: str = Query(None, alias="hub.mode"),
@@ -371,10 +385,7 @@ async def verify_webhook(
 
         print("WEBHOOK VERIFIED SUCCESSFULLY")
 
-        return PlainTextResponse(
-            content=hub_challenge,
-            status_code=200
-        )
+        return PlainTextResponse(content=hub_challenge)
 
     print("WEBHOOK VERIFICATION FAILED")
 
@@ -385,11 +396,9 @@ async def verify_webhook(
 
 
 @app.post("/webhook")
-async def whatsapp_webhook(request: Request):
+async def whatsapp_webhook(payload: dict):
 
     try:
-
-        payload = await request.json()
 
         print("Webhook Payload:", payload)
 
@@ -397,47 +406,45 @@ async def whatsapp_webhook(request: Request):
 
         if not entry:
 
-            print("NO ENTRY FOUND")
-
-            return {"status": "no entry"}
+            return {
+                "status": "no entry"
+            }
 
         changes = entry[0].get("changes", [])
 
         if not changes:
 
-            print("NO CHANGES FOUND")
-
-            return {"status": "no changes"}
+            return {
+                "status": "no changes"
+            }
 
         value = changes[0].get("value", {})
 
         messages = value.get("messages")
 
+        # Ignore delivery/status webhooks
         if not messages:
 
-            print("NO MESSAGES FOUND")
-
-            return {"status": "no messages"}
+            return {
+                "status": "no messages"
+            }
 
         message = messages[0]
 
+        # Ignore non-text messages
         if "text" not in message:
 
-            print("NON TEXT MESSAGE")
+            return {
+                "status": "non-text message ignored"
+            }
 
-            return {"status": "non text"}
+        user_question = message["text"]["body"]
 
-        sender = message.get("from")
-
-        user_question = message.get(
-            "text",
-            {}
-        ).get(
-            "body",
-            ""
-        )
+        sender = message["from"]
 
         print("User Message:", user_question)
+
+        # VECTOR SEARCH
 
         query_embedding = embed_model.get_text_embedding(
             user_question
@@ -469,22 +476,23 @@ async def whatsapp_webhook(request: Request):
         )
 
         prompt = f"""
-You are a helpful AI assistant.
+        You are a helpful AI assistant.
+        Answer the user's question using the provided context.
 
-Answer the user's question using the provided context.
+        Context:
+        {context}
 
-Context:
-{context}
-
-Question:
-{user_question}
-"""
+        Question:
+        {user_question}
+        """
 
         response = Settings.llm.complete(prompt)
 
         answer = str(response)
 
         print("AI Response:", answer)
+
+        # SEND MESSAGE BACK TO WHATSAPP
 
         url = f"https://graph.facebook.com/v22.0/{PHONE_NUMBER_ID}/messages"
 
