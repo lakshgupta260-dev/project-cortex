@@ -5,3 +5,6 @@ __pycache__/
 *.pdf
 *.docx
 *.csv
+*.pyo
+*.pyd
+.DS_Store
